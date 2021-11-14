@@ -75,6 +75,12 @@ let docs = [
         "method": "DELETE",
         "body": null,
         "description": "Deletes the item from myCart with given index"
+    },
+    {
+        "Endpoint": "/grocery/:id/:name/:pass",
+        "method": "DELETE",
+        "body": null,
+        "description": "Deletes the item from Gorcery with given index if credentials matches"
     }
 ];
 
@@ -157,6 +163,27 @@ app.delete('/cart/:id', (req, res) => {
     })
 
     res.send('Grocery deleted from My Cart')
+
+})
+
+app.delete('/grocery/:id/:name/:pass', (req, res) => {
+    const groceryid = req.params.id;
+    const name = req.params.name;
+    const pass = req.params.pass;
+    
+
+    if(name == 'admin' && pass == 'pass') {
+        groceryList = groceryList.filter(i => {
+            if(i.productid != groceryid) {
+                return true;
+            }
+    
+            return false;
+        })
+        return res.send('Grocery deleted from List')
+    }
+
+    res.send('Wrong Credentials, Item Cannot be deleted')
 
 })
 
