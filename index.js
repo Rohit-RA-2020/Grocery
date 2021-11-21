@@ -1,24 +1,12 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const mongoose = require('mongoose');
+require('dotenv/config');
+const Grocery = require('./models/Grocery');
 
 const app = express()
 const port = process.env.PORT || 3000;
-
-let groceryList = [
-    {
-        "productid": 1,
-        "grocery-name": "carrot",
-        "price": "20/kg",
-        "quantity": 100
-    },
-    {
-        "productid": 2,
-        "grocery-name": "apple",
-        "price": "100/kg",
-        "quantity": 200
-    }
-];
 
 let myCart = [
     {
@@ -55,20 +43,20 @@ let docs = [
         "description": "Returns a single Grocery item matching with the param name"
     },
     {
-        "Endpoint": "/grocery/add/:name/:pass",
+        "Endpoint": "/grocery/add",
         "method": "POST",
-        "body" : {
-            "body" : ""
+        "body": {
+            "body": ""
         },
-        "description" : "Adds data into main Grocery List only if name & pass matched the credentials"
+        "description": "Adds data into main Grocery List"
     },
     {
         "Endpoint": "/addtocart",
         "method": "POST",
-        "body" : {
-            "body" : ""
+        "body": {
+            "body": ""
         },
-        "description" : "Adds the item into mycart sent in post request if the item is present in the main list"
+        "description": "Adds the item into mycart sent in post request if the item is present in the main list"
     },
     {
         "Endpoint": "/cart/:id",
@@ -77,10 +65,10 @@ let docs = [
         "description": "Deletes the item from myCart with given index"
     },
     {
-        "Endpoint": "/grocery/:id/:name/:pass",
+        "Endpoint": "/grocery/:id",
         "method": "DELETE",
         "body": null,
-        "description": "Deletes the item from Gorcery with given index if credentials matches"
+        "description": "Deletes the item from Gorcery with given index"
     }
 ];
 
@@ -93,59 +81,66 @@ app.get('/', (req, res) => {
     res.json(docs);
 });
 
-app.get('/grocery', (req, res) => {
-    res.json(groceryList);
+app.get('/grocery', async (req, res) => {
+    try {
+        const grocery = await Grocery.find();
+        res.json(grocery);
+    } catch (e) {
+        res.json({ message: e });
+    }
 })
 
 app.get('/mycart', (req, res) => {
-    if(myCart.length == 0)
-    {
+    if (myCart.length == 0) {
         res.send('Cart is Empty');
     } else {
         res.json(myCart);
-    }   
+    }
 })
 
-app.get('/grocery/:name', (req, res) => {
-    const groceryName = req.params.name;
-    console.log(groceryName);
-
-    for(let grocery of groceryList) {
-        if(grocery['grocery-name'] == groceryName) {
-            res.json(grocery);
-            console.log(grocery);
-            return;
-        }
+app.get('/grocery/:name', async (req, res) => {
+    try {
+        const post = await Grocery.findOne({ groceryname: req.params.name });
+        res.json(post);
+    } catch (error) {
+        res.json({ message: error });
     }
-    return res.json('Item not present in the list')
 
 });
 
-app.post('/grocery/add/:name/:pass', (req, res) => {
-    const name = req.params.name;
-    const pass = req.params.pass;
+app.post('/grocery/add', async (req, res) => {
 
-    const grocery = req.body;
+    const grocery = new Grocery({
+        productid: req.body.productid,
+        groceryname: req.body.groceryname,
+        price: req.body.price,
+        quantity: req.body.quantity
+    });
 
-    if(name == 'admin' && pass == 'pass') {
-        console.log(grocery);
-        groceryList.push(grocery);
-
-        return res.send('Grocery Added to main List');
+    try {
+        const savedGrocery = await grocery.save()
+        res.json(savedGrocery);
+    } catch (e) {
+        res.json({ message: e });
     }
 
-    res.send('Wrong Credentials')
 })
 
-app.post('/addtocart', (req, res) => {
-    const newGrocery = req.body;
+app.post('/addtocart', async (req, res) => {
 
-    for(let grocery of groceryList) {
-        if(newGrocery['grocery-name'] == grocery["grocery-name"]) {
-            myCart.push(newGrocery);
-            grocery.quantity -= newGrocery.quantity;
-            return res.send(myCart);
+    const toadd = req.body;
+    console.log(toadd);
+
+    try {
+        if (await Grocery.exists({groceryname: toadd.groceryname})) {
+            myCart.push(toadd);
+            
+            return res.json(myCart);
         }
+
+
+    } catch (e) {
+        return res.send({ message: e })
     }
 
     return res.json('Item not in the list');
@@ -155,7 +150,7 @@ app.delete('/cart/:id', (req, res) => {
     const groceryid = req.params.id;
 
     myCart = myCart.filter(i => {
-        if(i.productid != groceryid) {
+        if (i.productid != groceryid) {
             return true;
         }
 
@@ -166,25 +161,17 @@ app.delete('/cart/:id', (req, res) => {
 
 })
 
-app.delete('/grocery/:id/:name/:pass', (req, res) => {
-    const groceryid = req.params.id;
-    const name = req.params.name;
-    const pass = req.params.pass;
-    
-
-    if(name == 'admin' && pass == 'pass') {
-        groceryList = groceryList.filter(i => {
-            if(i.productid != groceryid) {
-                return true;
-            }
-    
-            return false;
-        })
-        return res.send('Grocery deleted from List')
+app.delete('/grocery/:id', async (req, res) => {
+    try {
+        const removedGrocery = await Grocery.remove({ productid: req.params.id });
+        res.json(removedGrocery);
+    } catch (e) {
+        res.json({ message: e });
     }
-
-    res.send('Wrong Credentials, Item Cannot be deleted')
-
 })
+
+mongoose.connect(process.env.DB_CONNECTION, { useNewUrlParser: true }, () => {
+    console.log('Connected to DB');
+});
 
 app.listen(port, () => console.log(`Grocery app listening on port ${port}!`));
